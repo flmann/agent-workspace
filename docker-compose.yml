@@ -1,0 +1,35 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        AGENT_UID: ${AGENT_UID:-1000}
+        AGENT_GID: ${AGENT_GID:-1000}
+    image: agent-sandbox
+
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    read_only: true # Set to false to enable apt install or editing /usr /etc /opt ...
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: ${AGENT_MEM_LIMIT:-4g} # Set in .env
+    cpus: ${AGENT_CPUS:-2} # Set in .env
+    volumes:
+      - ${PWD}:/workspace
+      - ${AGENT_HOME:?set AGENT_HOME in .env}:/home/agent
+    tmpfs:
+      - /tmp:exec,mode=1777     # Writable tmp, since the root filesystem is read-only
+      - /home/agent/.cache:mode=1777
+    environment:     # Pass .env
+      ANTHROPIC_API_KEY:
+      OPENAI_API_KEY:
+      SCADSAI_API_KEY:
+      GH_TOKEN:
+      GITLAB_TOKEN:
+      TZ: ${TZ:-Europe/Berlin}
+    command: ["bash"]
