@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# agent-workspace: run a command in the agent sandbox container, with the
+# current directory mounted at /workspace.
+#
+#   agent-workspace claude          # start Claude Code
+#   agent-workspace codex --help    # any command plus arguments
+#   agent-workspace                 # start bash
+#   agent-workspace --build claude  # rebuild the image
+#
+# Can be symlinked:
+#   ln -s /path/to/agent-workspace ~/.local/bin/agent-workspace
+set -euo pipefail
+
+# Resolve the real location of this script (follows symlinks) so the compose
+# file is found no matter where the wrapper is called from.
+src="${BASH_SOURCE[0]}"
+while [[ -L "$src" ]]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ "$src" != /* ]] && src="$dir/$src"
+done
+script_dir="$(cd -P "$(dirname "$src")" && pwd)"
+
+compose_file="$script_dir/docker-compose.yml"
+image="agent-sandbox"
+service="agent"
+
+usage() {
+  sed -n '2,12p' "$src" | sed 's/^# \{0,1\}//'
+}
+
+build=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --build)   build=1; shift ;;
+    --)        shift; break ;;
+    *)         break ;;
+  esac
+done
+
+if [[ ! -f "$script_dir/.env" ]]; then
+  echo "agent-workspace: $script_dir/.env not found." >&2
+  echo "Copy .env.sample to .env and adjust it first." >&2
+  exit 1
+fi
+
+# Run compose from the script directory so it reads .env there, but keep the
+# caller's directory as PWD: the compose file mounts ${PWD} as /workspace.
+PWD="$(pwd)"
+export PWD
+compose=(docker compose --project-directory "$script_dir" -f "$compose_file" -p agent-sandbox)
+
+# Docker would create a missing bind-mount source as root, so create the home
+# directory ourselves. Its path is read from the resolved compose config.
+home_dir="$("${compose[@]}" config 2>/dev/null \
+  | awk '$1=="source:"{src=$2} $1=="target:" && $2=="/home/agent"{print src; exit}')"
+if [[ -z "$home_dir" ]]; then
+  echo "agent-workspace: could not resolve the home directory; is AGENT_HOME set in .env?" >&2
+  "${compose[@]}" config >/dev/null  # print compose's own error
+  exit 1
+fi
+mkdir -p "$home_dir"
+
+if [[ $build -eq 1 ]] || ! docker image inspect "$image" >/dev/null 2>&1; then
+  "${compose[@]}" build
+fi
+
+exec "${compose[@]}" run --rm "$service" "$@"
