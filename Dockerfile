@@ -11,6 +11,12 @@ ARG GLAB_VERSION=1.128.0
 ARG AGENT_UID=1000
 ARG AGENT_GID=1000
 
+ARG INSTALL_CLAUDE=true
+ARG INSTALL_CODEX=true
+ARG INSTALL_OPENCODE=true
+ARG INSTALL_OMP=true
+ARG CLAUDE_CODE_VERSION=latest
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl wget git openssh-client gh \
         ripgrep fd-find tree jq \
@@ -61,13 +67,27 @@ RUN uv python install --default \
     && uv tool install pdf-reader-mcp \
     && chmod -R a+rX /opt/uv
 
-RUN npm install -g \
-        @anthropic-ai/claude-code \
-        @openai/codex \
-        opencode-ai \
-    && bun install -g @oh-my-pi/pi-coding-agent @oh-my-pi/pi-natives \
-    && chmod -R a+rX /opt/bun \
-    && npm cache clean --force
+RUN set -eux; \
+    if [ "$INSTALL_CLAUDE" = "true" ]; then \
+        curl -fsSL https://claude.ai/install.sh | HOME=/opt/claude bash -s "$CLAUDE_CODE_VERSION"; \
+        ln -s /opt/claude/.local/bin/claude /usr/local/bin/claude; \
+        chmod -R a+rX /opt/claude; \
+        claude --version; \
+    fi
+ENV DISABLE_AUTOUPDATER=1
+
+RUN set -eux; \
+    npm_pkgs=""; \
+    if [ "$INSTALL_CODEX" = "true" ]; then npm_pkgs="$npm_pkgs @openai/codex"; fi; \
+    if [ "$INSTALL_OPENCODE" = "true" ]; then npm_pkgs="$npm_pkgs opencode-ai"; fi; \
+    if [ -n "$npm_pkgs" ]; then \
+        npm install -g $npm_pkgs; \
+        npm cache clean --force; \
+    fi; \
+    if [ "$INSTALL_OMP" = "true" ]; then \
+        bun install -g @oh-my-pi/pi-coding-agent @oh-my-pi/pi-natives; \
+        chmod -R a+rX /opt/bun; \
+    fi
 
 RUN groupadd -g "${AGENT_GID}" agent \
     && useradd -m -u "${AGENT_UID}" -g agent -s /bin/bash agent

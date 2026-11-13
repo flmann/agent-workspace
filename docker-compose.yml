@@ -6,6 +6,12 @@ services:
       args:
         AGENT_UID: ${AGENT_UID:-1000}
         AGENT_GID: ${AGENT_GID:-1000}
+        # Agents to install; set to false in .env to skip
+        INSTALL_CLAUDE: ${INSTALL_CLAUDE:-true}
+        INSTALL_CODEX: ${INSTALL_CODEX:-true}
+        INSTALL_OPENCODE: ${INSTALL_OPENCODE:-true}
+        INSTALL_OMP: ${INSTALL_OMP:-true}
+        CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
     image: agent-sandbox
 
     stdin_open: true
@@ -25,7 +31,7 @@ services:
     tmpfs:
       - /tmp:exec,mode=1777     # Writable tmp, since the root filesystem is read-only
       - /home/agent/.cache:mode=1777
-    environment:     # Pass .env
+    environment:
       ANTHROPIC_API_KEY:
       OPENAI_API_KEY:
       SCADSAI_API_KEY:

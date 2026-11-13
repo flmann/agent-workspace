@@ -17,7 +17,7 @@ agent-workspace claude           # or codex, opencode, omp
 agent-workspace                  # plain bash
 agent-workspace --build claude   # rebuild the image first
 ```
-The docker image is built on first use. `AGENT_HOME` (default `~/Docker/agent-workspace/home`) is mounted as `/home/agent` and keeps logins, sessions and config.
+The docker image is built on first use. Agents can be left out of the image by setting `INSTALL_CLAUDE`, `INSTALL_CODEX`, `INSTALL_OPENCODE` or `INSTALL_OMP` to `false` in `.env`; rebuild with `--build` afterwards. `AGENT_HOME` (default `~/Docker/agent-workspace/home`) is mounted as `/home/agent` and keeps logins, sessions and config.
 
 ## Included Tools
 python (uv), uv, ruff, node LTS, bun, tectonic, pandoc, ffmpeg, imagemagick, poppler, git, gh, glab, ripgrep, fd, jq, yq, and standard build and debug tools.
