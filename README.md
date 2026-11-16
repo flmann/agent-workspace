@@ -19,6 +19,13 @@ agent-workspace --build claude   # rebuild the image first
 ```
 The docker image is built on first use. Agents can be left out of the image by setting `INSTALL_CLAUDE`, `INSTALL_CODEX`, `INSTALL_OPENCODE` or `INSTALL_OMP` to `false` in `.env`; rebuild with `--build` afterwards. `AGENT_HOME` (default `~/Docker/agent-workspace/home`) is mounted as `/home/agent` and keeps logins, sessions and config.
 
+## Optional MCP Servers
+Enable in `.env`, rebuild with `--build`, then register with your agent (e.g. `claude mcp add <name> -- <command>`).
+
+| Server | `.env` | Command | Notes |
+|---|---|---|---|
+| [freecad-mcp](https://github.com/neka-nat/freecad-mcp) | `INSTALL_FREECAD_MCP=true` | `freecad-mcp --host host.docker.internal` | Requires FreeCAD MCP addon on host, port 9875 |
+
 ## Included Tools
 python (uv), uv, ruff, node LTS, bun, tectonic, pandoc, ffmpeg, imagemagick, poppler, git, gh, glab, ripgrep, fd, jq, yq, and standard build and debug tools.
 

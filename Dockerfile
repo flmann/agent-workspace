@@ -16,6 +16,7 @@ ARG INSTALL_CODEX=true
 ARG INSTALL_OPENCODE=true
 ARG INSTALL_OMP=true
 ARG CLAUDE_CODE_VERSION=latest
+ARG INSTALL_FREECAD_MCP=false
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl wget git openssh-client gh \
@@ -65,6 +66,7 @@ ENV BUN_INSTALL=/opt/bun \
 RUN uv python install --default \
     && uv tool install ruff \
     && uv tool install pdf-reader-mcp \
+    && if [ "$INSTALL_FREECAD_MCP" = "true" ]; then uv tool install freecad-mcp; fi \
     && chmod -R a+rX /opt/uv
 
 RUN set -eux; \

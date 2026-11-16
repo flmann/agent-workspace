@@ -12,6 +12,7 @@ services:
         INSTALL_OPENCODE: ${INSTALL_OPENCODE:-true}
         INSTALL_OMP: ${INSTALL_OMP:-true}
         CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
+        INSTALL_FREECAD_MCP: ${INSTALL_FREECAD_MCP:-false}
     image: agent-sandbox
 
     stdin_open: true
@@ -28,6 +29,8 @@ services:
     volumes:
       - ${PWD}:/workspace
       - ${AGENT_HOME:?set AGENT_HOME in .env}:/home/agent
+    extra_hosts:
+      - host.docker.internal:host-gateway # Reach host services, e.g. FreeCAD's RPC server
     tmpfs:
       - /tmp:exec,mode=1777     # Writable tmp, since the root filesystem is read-only
       - /home/agent/.cache:mode=1777
