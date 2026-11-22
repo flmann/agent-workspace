@@ -1,7 +1,3 @@
-# Run from the project you want the agent to work on:
-#   docker compose -f /path/to/this/docker-compose.yml run --rm agent claude
-# The current directory (PWD) is mounted at /workspace.
-# Copy .env.sample to .env (next to this file) and adjust it first.
 services:
   agent:
     build:
@@ -10,37 +6,34 @@ services:
       args:
         AGENT_UID: ${AGENT_UID:-1000}
         AGENT_GID: ${AGENT_GID:-1000}
+        # Agents to install; set to false in .env to skip
+        INSTALL_CLAUDE: ${INSTALL_CLAUDE:-true}
+        INSTALL_CODEX: ${INSTALL_CODEX:-true}
+        INSTALL_OPENCODE: ${INSTALL_OPENCODE:-true}
+        INSTALL_OMP: ${INSTALL_OMP:-true}
+        CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-latest}
+        INSTALL_FREECAD_MCP: ${INSTALL_FREECAD_MCP:-false}
     image: agent-sandbox
 
     stdin_open: true
     tty: true
     working_dir: /workspace
-
-    # --- Security hardening ---
-    read_only: true
+    read_only: true # Set to false to enable apt install or editing /usr /etc /opt ...
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-
-    # --- Resource limits ---
     pids_limit: 512
-    mem_limit: ${AGENT_MEM_LIMIT:-4g}
-    cpus: ${AGENT_CPUS:-2}
-
-    # --- Mounts ---
+    mem_limit: ${AGENT_MEM_LIMIT:-4g} # Set in .env
+    cpus: ${AGENT_CPUS:-2} # Set in .env
     volumes:
-      # Current directory -> /workspace
       - ${PWD}:/workspace
-      # Directory from .env -> home of the 'agent' user (auth, config, history)
       - ${AGENT_HOME:?set AGENT_HOME in .env}:/home/agent
-
-    # Writable scratch space, since the root filesystem is read-only
+    extra_hosts:
+      - host.docker.internal:host-gateway # Reach host services, e.g. FreeCAD's RPC server
     tmpfs:
-      - /tmp:exec,mode=1777
+      - /tmp:exec,mode=1777     # Writable tmp, since the root filesystem is read-only
       - /home/agent/.cache:mode=1777
-
-    # Only variables that are set in .env or the shell are passed through.
     environment:
       ANTHROPIC_API_KEY:
       OPENAI_API_KEY:
@@ -48,7 +41,4 @@ services:
       GH_TOKEN:
       GITLAB_TOKEN:
       TZ: ${TZ:-Europe/Berlin}
-
-    # No fixed command: pick the agent at run time
-    # (claude | codex | opencode | omp | bash)
     command: ["bash"]

@@ -4,10 +4,10 @@
 #
 #   agent-workspace claude          # start Claude Code
 #   agent-workspace codex --help    # any command plus arguments
-#   agent-workspace                 # interactive bash
-#   agent-workspace --build claude  # rebuild the image first
+#   agent-workspace                 # start bash
+#   agent-workspace --build claude  # rebuild the image
 #
-# Can be symlinked into a directory on PATH, e.g.
+# Can be symlinked:
 #   ln -s /path/to/agent-workspace ~/.local/bin/agent-workspace
 set -euo pipefail
 
@@ -66,4 +66,13 @@ if [[ $build -eq 1 ]] || ! docker image inspect "$image" >/dev/null 2>&1; then
   "${compose[@]}" build
 fi
 
-exec "${compose[@]}" run --rm "$service" "$@"
+# Container name: agent-workspace-<current dir>-<4 random hex chars>.
+# Characters Docker does not allow in names are replaced by "-".
+dir_name="$(basename "$PWD" | tr -c 'a-zA-Z0-9_.-' '-' | sed 's/^-*//; s/-*$//')"
+[[ -n "$dir_name" ]] || dir_name="root"
+while :; do
+  name="agent-workspace-${dir_name}-$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"
+  docker container inspect "$name" >/dev/null 2>&1 || break  # retry on collision
+done
+
+exec "${compose[@]}" run --rm --name "$name" "$service" "$@"

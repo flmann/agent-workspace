@@ -1,7 +1,3 @@
-# syntax=docker/dockerfile:1
-# Unified agent sandbox: Claude Code, Codex, OpenCode and OMP in one image.
-
-# Source stages for binaries copied into the final image (all multi-arch)
 FROM node:lts-trixie-slim AS node
 FROM oven/bun:1 AS bun
 FROM ghcr.io/astral-sh/uv:latest AS uv
@@ -15,7 +11,13 @@ ARG GLAB_VERSION=1.128.0
 ARG AGENT_UID=1000
 ARG AGENT_GID=1000
 
-# --- System packages ---
+ARG INSTALL_CLAUDE=true
+ARG INSTALL_CODEX=true
+ARG INSTALL_OPENCODE=true
+ARG INSTALL_OMP=true
+ARG CLAUDE_CODE_VERSION=latest
+ARG INSTALL_FREECAD_MCP=false
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl wget git openssh-client gh \
         ripgrep fd-find tree jq \
@@ -27,7 +29,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -s "$(command -v fdfind)" /usr/local/bin/fd \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Per-architecture binaries: yq, glab, tectonic ---
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
@@ -47,7 +48,6 @@ RUN set -eux; \
     chmod +x /usr/local/bin/tectonic; \
     yq --version; glab --version; tectonic --version
 
-# --- Node LTS, bun, uv ---
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
@@ -56,8 +56,6 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-# Everything below installs system-wide, because the home directory is
-# bind-mounted at runtime and would hide anything installed into it.
 ENV BUN_INSTALL=/opt/bun \
     UV_PYTHON_INSTALL_DIR=/opt/uv/python \
     UV_TOOL_DIR=/opt/uv/tools \
@@ -65,21 +63,34 @@ ENV BUN_INSTALL=/opt/bun \
     UV_PYTHON_PREFERENCE=managed \
     PATH="/opt/bun/bin:${PATH}"
 
-# --- Python, Python tools, agent CLIs ---
 RUN uv python install --default \
     && uv tool install ruff \
     && uv tool install pdf-reader-mcp \
+    && if [ "$INSTALL_FREECAD_MCP" = "true" ]; then uv tool install freecad-mcp; fi \
     && chmod -R a+rX /opt/uv
 
-RUN npm install -g \
-        @anthropic-ai/claude-code \
-        @openai/codex \
-        opencode-ai \
-    && bun install -g @oh-my-pi/pi-coding-agent @oh-my-pi/pi-natives \
-    && chmod -R a+rX /opt/bun \
-    && npm cache clean --force
+RUN set -eux; \
+    if [ "$INSTALL_CLAUDE" = "true" ]; then \
+        curl -fsSL https://claude.ai/install.sh | HOME=/opt/claude bash -s "$CLAUDE_CODE_VERSION"; \
+        ln -s /opt/claude/.local/bin/claude /usr/local/bin/claude; \
+        chmod -R a+rX /opt/claude; \
+        claude --version; \
+    fi
+ENV DISABLE_AUTOUPDATER=1
 
-# --- Non-root user ---
+RUN set -eux; \
+    npm_pkgs=""; \
+    if [ "$INSTALL_CODEX" = "true" ]; then npm_pkgs="$npm_pkgs @openai/codex"; fi; \
+    if [ "$INSTALL_OPENCODE" = "true" ]; then npm_pkgs="$npm_pkgs opencode-ai"; fi; \
+    if [ -n "$npm_pkgs" ]; then \
+        npm install -g $npm_pkgs; \
+        npm cache clean --force; \
+    fi; \
+    if [ "$INSTALL_OMP" = "true" ]; then \
+        bun install -g @oh-my-pi/pi-coding-agent @oh-my-pi/pi-natives; \
+        chmod -R a+rX /opt/bun; \
+    fi
+
 RUN groupadd -g "${AGENT_GID}" agent \
     && useradd -m -u "${AGENT_UID}" -g agent -s /bin/bash agent
 
